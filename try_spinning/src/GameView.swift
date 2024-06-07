@@ -116,8 +116,8 @@ class GameView: MTKView {
         // Load a texture & get a sampler
         LoadTexture(
             // filename: "niceTexture.png", 
-            filename: "fossil.jpeg", 
-            directory: "/Users/abe/Documents/GitHub/LearningSwift/Wave"
+            filename: "space1.png", 
+            directory: "./images"
         )
         CreateSampler()
 
