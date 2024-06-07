@@ -25,8 +25,8 @@ class GameView: MTKView {
 
     // Update Function
     var timer: Timer?
-    let cosTheta: Float = cos(20 * .pi / 180)
-    let sinTheta: Float = sin(20 * .pi / 180)
+    let cosTheta: Float = cos(4 * .pi / 180)
+    let sinTheta: Float = sin(4 * .pi / 180)
 
     struct Vertex{
         var position: SIMD4<Float>
@@ -116,7 +116,7 @@ class GameView: MTKView {
         // Load a texture & get a sampler
         LoadTexture(
             // filename: "niceTexture.png", 
-            filename: "space1.png", 
+            filename: "star.png", 
             directory: "./images"
         )
         CreateSampler()
@@ -153,11 +153,11 @@ class GameView: MTKView {
 
     @objc func updateVertices() {
         // oooh baby let's spin
+        let bufferPointer = vertexBuffer.contents()
+        let vertexPointer = bufferPointer.assumingMemoryBound(to: Vertex.self)
         for i in 0...(vertices.count-1) {
-            vertices[i].position = rotateVert(x: vertices[i].position[0], y: vertices[i].position[1])
+            vertexPointer[i].position = rotateVert(x: vertexPointer[i].position[0], y: vertexPointer[i].position[1])
         }
-        // Don't forget to update the buffer (should I be using UpdateVertBuffer() rather than re-creating? Probably.)
-        CreateVertBuffer()
     }
 
     override func draw(_ dirtyRect: NSRect) {
