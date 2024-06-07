@@ -26,7 +26,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let device = MTLCreateSystemDefaultDevice()
         let myGameView = GameView(frame: window.contentView!.bounds, device: device)
         myGameView.autoresizingMask = [.width, .height]
-        myGameView.preferredFramesPerSecond = 120
+        // myGameView.preferredFramesPerSecond = 120
         myGameView.isPaused = false
         myGameView.enableSetNeedsDisplay = false
         window.contentView = myGameView

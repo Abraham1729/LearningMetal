@@ -27,7 +27,6 @@ class GameView: MTKView {
     var timer: Timer?
     let cosTheta: Float = cos(20 * .pi / 180)
     let sinTheta: Float = sin(20 * .pi / 180)
-    let fps: Int = 120
 
     struct Vertex{
         var position: SIMD4<Float>
@@ -140,7 +139,7 @@ class GameView: MTKView {
 
         // We want action, something to really animate the experience
         self.timer = Timer.scheduledTimer(
-            timeInterval: 1 / fps, 
+            timeInterval: 1 / 60, 
             target: self, 
             selector: #selector(updateVertices), 
             userInfo: nil, 
