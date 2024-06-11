@@ -1,43 +1,34 @@
 import MetalKit
 import Foundation
 
+// TODO: Create "game" functionality which is managed by another class.
+// I don't want to be stuck doing game management via View class. That divide doesn't make sense.
+
+struct Vertex{
+    var position: SIMD4<Float>
+    var uv: SIMD2<Float>
+}
+
 class GameView: MTKView {
-    // Texture & Sampler Properties //
-    var textureDescriptor: MTLTextureDescriptor!
     var texture: MTLTexture!
-    var samplerDescriptor: MTLSamplerDescriptor!
-    var samplerState: MTLSamplerState!
-
-    // Vertex Properties //
     var vertices: [Vertex]!
-    var vertexBuffer: MTLBuffer!
-    var vertexDescriptor: MTLVertexDescriptor!
-
-    // Library
-    var library: MTLLibrary!
-    var vertexFunction: MTLFunction?
-    var fragmentFunction: MTLFunction?
-
-    // Rendering Pipeline
-    var commandQueue: MTLCommandQueue!
-    var pipelineState: MTLRenderPipelineState!
-    var pipelineDescriptor: MTLRenderPipelineDescriptor!
+    var renderer: Renderer!
 
     // Update Function
     var timer: Timer?
-    let cosTheta: Float = cos(4 * .pi / 180)
+    let cosTheta: Float = cos(2 * .pi / 180)
     let sinTheta: Float = sin(4 * .pi / 180)
 
-    struct Vertex{
-        var position: SIMD4<Float>
-        var uv: SIMD2<Float>
+    func LoadTexture(filename: String, directory: String) {
+        let textureLoader = MTKTextureLoader(device: device!)
+        let fileURL = URL(fileURLWithPath: directory).appendingPathComponent(filename)
+        do {
+            texture = try textureLoader.newTexture(URL: fileURL, options: nil)
+        } catch {
+            print("Error loading texture: \(error)")
+        }
     }
 
-    required init(coder: NSCoder) {
-        super.init(coder: coder)
-    }
-
-    //// Vert setup functions ////
     func CreateVerts() {
         vertices =
         [
@@ -53,91 +44,21 @@ class GameView: MTKView {
         ]
     }
 
-    func CreateVertBuffer(){
-        vertexBuffer = device?.makeBuffer(bytes: vertices, length: MemoryLayout<Vertex>.stride * vertices.count, options: [])
+    required init(coder: NSCoder) {
+        super.init(coder: coder)
     }
 
-    func CreateVertDescriptor() {
-        vertexDescriptor = MTLVertexDescriptor()
-
-        // Position attribute
-        vertexDescriptor.attributes[0].format = .float4
-        vertexDescriptor.attributes[0].offset = 0
-        vertexDescriptor.attributes[0].bufferIndex = 0
-
-        // UV attribute
-        vertexDescriptor.attributes[1].format = .float2
-        vertexDescriptor.attributes[1].offset = MemoryLayout<SIMD4<Float>>.stride
-        vertexDescriptor.attributes[1].bufferIndex = 0
-
-        // Layout of the buffer
-        vertexDescriptor.layouts[0].stride = MemoryLayout<Vertex>.stride
-        vertexDescriptor.layouts[0].stepFunction = .perVertex
-    }
-
-    //// Texture & Sampler ////
-
-    func LoadTexture(filename: String, directory: String) {
-        let textureLoader = MTKTextureLoader(device: device!)
-        let fileURL = URL(fileURLWithPath: directory).appendingPathComponent(filename)
-        do {
-            texture = try textureLoader.newTexture(URL: fileURL, options: nil)
-        } catch {
-            print("Error loading texture: \(error)")
-        }
-    }
-
-    func CreateSampler() {
-        samplerDescriptor = MTLSamplerDescriptor()
-        samplerDescriptor.minFilter = .nearest // ./linear?
-        samplerDescriptor.magFilter = .nearest // ./linear?
-        samplerState = device?.makeSamplerState(descriptor: samplerDescriptor)
-    }
-    
-    //// Library: Shader Functions ////
-    func GetLibrary(directory: String, filename: String) {
-        let shaderURL = URL(fileURLWithPath: directory).appendingPathComponent(filename)
-        library = try! self.device?.makeLibrary(URL: shaderURL)
-        vertexFunction = library.makeFunction(name: "vertex_main")
-        fragmentFunction = library.makeFunction(name: "fragment_main")
-    }
-
-    override init(frame frameRect: NSRect, device: MTLDevice?)
-    {
+    override init(frame frameRect: NSRect, device: MTLDevice?) {
         super.init(frame: frameRect, device: device)
-        let device = device!
-
-        // Get VertexFunction and Fragment Function
-        GetLibrary(
-            directory: "./lib",
-            filename: "shaders.metallib"
-        )
-
-        // Load a texture & get a sampler
-        LoadTexture(
-            // filename: "niceTexture.png", 
-            filename: "star.png", 
-            directory: "./images"
-        )
-        CreateSampler()
-
-        // Create & manage vertices to display texture
-        CreateVerts()      
-        CreateVertBuffer()  
-        CreateVertDescriptor()
         
-        // Rendering Pipeline core pieces...
-        commandQueue = device.makeCommandQueue()
-        pipelineDescriptor = MTLRenderPipelineDescriptor()
-        pipelineDescriptor.vertexFunction = vertexFunction
-        pipelineDescriptor.fragmentFunction = fragmentFunction
-        pipelineDescriptor.vertexDescriptor = vertexDescriptor
-        pipelineDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+        let device = device!
+        
+        LoadTexture(filename: "star.png", directory: "./images")
+        
+        CreateVerts()
 
-        // Once the Pipeline Descriptor is set up, we should be good to make the pipeline state.
-        pipelineState = try! device.makeRenderPipelineState(descriptor: pipelineDescriptor)
+        self.renderer = Renderer(device: device, vertexData: vertices, texture: texture)
 
-        // We want action, something to really animate the experience
         self.timer = Timer.scheduledTimer(
             timeInterval: 1 / 60, 
             target: self, 
@@ -152,32 +73,16 @@ class GameView: MTKView {
     }
 
     @objc func updateVertices() {
-        // oooh baby let's spin
-        let bufferPointer = vertexBuffer.contents()
+        let bufferPointer = renderer.vertexBuffer.contents()
         let vertexPointer = bufferPointer.assumingMemoryBound(to: Vertex.self)
-        for i in 0...(vertices.count-1) {
+        for i in 0...(5) {
             vertexPointer[i].position = rotateVert(x: vertexPointer[i].position[0], y: vertexPointer[i].position[1])
-        }
+        }    
     }
 
     override func draw(_ dirtyRect: NSRect) {
         guard let drawable = self.currentDrawable,
-              let descriptor = self.currentRenderPassDescriptor,
-              let commandBuffer = commandQueue.makeCommandBuffer(),
-              let renderEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor) else { return }
-        
-        renderEncoder.setRenderPipelineState(pipelineState)
-
-        // Passing to vert shader
-        renderEncoder.setVertexBuffer(vertexBuffer, offset: 0, index: 0)
-
-        // Passing to fragemnt shader
-        renderEncoder.setFragmentTexture(texture, index: 0)
-        renderEncoder.setFragmentSamplerState(samplerState, index: 0)
-        renderEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: vertices.count) // maybe could do .trianglestrip if i was smart about rotations
-        
-        renderEncoder.endEncoding()
-        commandBuffer.present(drawable)
-        commandBuffer.commit()
+              let descriptor = self.currentRenderPassDescriptor else { return }        
+        self.renderer.render(drawable: drawable, currentRenderPassDescriptor: descriptor, vertices: vertices)
     }
 }
